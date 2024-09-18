@@ -115,6 +115,9 @@ uint8_t boot_music[4365];
 #define GMT_OFFSET_SEC        0
 #define DAY_LIGHT_OFFSET_SEC  0
 #define GET_TIMEZONE_API      "https://ipapi.co/timezone/"
+#define TZ_INFO "EST5EDT,M3.2.0,M11.1.0" //"America/NY" 
+// see http://www.gnu.org/software/libc/manual/html_node/TZ-Variable.html
+//https://github.com/nayarsystems/posix_tz_db/blob/master/zones.csv
 
 LV_IMG_DECLARE(arrow_left_png);
 LV_IMG_DECLARE(arrow_right_png);
@@ -423,6 +426,13 @@ void WiFiScanDone(WiFiEvent_t event, WiFiEventInfo_t info)
     canScreenOff = false;
 }
 
+void setTimezone(String timezone){
+  Serial.printf("  Setting Timezone to %s\n",timezone.c_str());
+  setenv("TZ",timezone.c_str(),1);  //  Now adjust the TZ.  Clock settings are adjusted to show the new local time
+  tzset();
+}
+
+
 void setup()
 {
     // Stop wifi
@@ -462,6 +472,10 @@ void setup()
     lv_input_event = xEventGroupCreate();
 
     usbPlugIn =  watch.isVbusIn();
+
+    // set notification call-back function
+    sntp_set_time_sync_notification_cb( timeavailable );
+    
     sntp_servermode_dhcp(1);    // (optional)
     configTime(gmtOffset_sec, daylightOffset_sec, ntpServer1, ntpServer2);
     wifi_test();
@@ -473,7 +487,7 @@ void setup()
     while (show_timeinfo.tm_year <= 0) {
          printLocalTime();
     }
-
+    
     setupGUI();
     // if (wifi_test_obj != NULL)
     //     lv_obj_del_delayed(wifi_test_obj, 1);
@@ -1502,6 +1516,13 @@ void timeavailable(struct timeval *t)
 {
     Serial.println("Got time adjustment from NTP!");
     printLocalTime();
+    
+    Serial.println("Setting hardware clock with NTP time!");
+    if(0 == settimeofday(t, NULL))
+        Serial.println("Setting hardware clock SUCCESS!");
+    else
+        Serial.println("Setting hardware clock FAILED!");
+
     WiFi.disconnect();
 }
 
